@@ -130,11 +130,11 @@ func (tmpl *Template) readString(s string) (string, error) {
 func (tmpl *Template) parsePartial(name string) (*Template, error) {
     filenames := []string{
         path.Join(tmpl.dir, name),
-        path.Join(tmpl.dir, name+".mustache"),
-        path.Join(tmpl.dir, name+".stache"),
+        path.Join(tmpl.dir, name+".hbs"),
+        path.Join(tmpl.dir, name+".html.hbs"),
         name,
-        name + ".mustache",
-        name + ".stache",
+        name + ".hbs",
+        name + ".html.hbs",
     }
     var filename string
     for _, name := range filenames {
@@ -401,6 +401,7 @@ func call(v reflect.Value, method reflect.Method) reflect.Value {
 // Evaluate interfaces and pointers looking for a value that can look up the name, via a
 // struct field, method, or map key, and return the result of the lookup.
 func lookup(contextChain []interface{}, name string) reflect.Value {
+  fmt.Println("LOOKING UP: " + name);
     defer func() {
         if r := recover(); r != nil {
             fmt.Printf("Panic while looking up %q: %s\n", name, r)
@@ -421,8 +422,10 @@ Outer:
                     }
                 }
             }
-            if name == "." {
+            if name == "." || name == "this" {
               return v
+            }
+            if _, ok := helpers[name]; ok {
             }
             switch av := v; av.Kind() {
             case reflect.Ptr:
@@ -487,7 +490,35 @@ loop:
 
 func renderSection(section *sectionElement, contextChain []interface{}, buf io.Writer) {
     value := lookup(contextChain, section.name)
-    fmt.Printf("\nVALUE(%v): %v\n", section.name, value)
+    if handler, ok := helpers[section.name]; ok {
+      fmt.Printf("\nVALUE(%v): %v\n", section.name, value)
+      var stringBuf bytes.Buffer
+      if len(section.elems) == 1 {
+        renderElement(section.elems[0], contextChain, &stringBuf)
+
+        params := make([]interface{}, 0)
+        for _, piece := range section.params {
+            param := fmt.Sprintf("%v", piece)
+            if param == "this" {
+                param = `.`
+            }
+            if len(param) > 1 && param[0] == '"' && param[len(param) - 1] == '"' {
+                params = append(params, param[1:len(param)-1])
+            } else {
+                paramVal := lookup(contextChain, param)
+                if paramVal.IsValid() {
+                    params = append(params, paramVal.Interface())
+                }
+            }
+        }
+        params = append(params, stringBuf.String())
+
+        renderElement(&textElement{
+          text: []byte(handler(params...)),
+        }, contextChain, buf);
+      }
+      return
+    }
     var context = contextChain[len(contextChain)-1].(reflect.Value)
     var contexts = []interface{}{}
     // if the value is nil, check if it's an inverted section
@@ -686,4 +717,25 @@ var helpers = make(map[string]helperFn)
 
 func RegisterHelper(name string, helper helperFn) {
     helpers[name] = helper
+}
+
+var content = make(map[string]*Template)
+
+func RegisterContent(name string, data string) error {
+    dirname, _ := path.Split(name)
+
+    tmpl := Template{string(data), "{{", "}}", 0, 1, dirname, []interface{}{}}
+    err := tmpl.parse()
+
+    if err != nil {
+        return err
+    }
+
+    content[name] = &tmpl
+    return nil
+}
+
+func ContentFor(name string) (*Template, bool) {
+  tmpl, ok := content[name]
+  return tmpl, ok
 }
