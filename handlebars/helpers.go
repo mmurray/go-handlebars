@@ -1,5 +1,5 @@
 package handlebars
-
+/*
 import (
   "fmt"
 )
@@ -25,4 +25,4 @@ func init() {
           return ""
         })
 
-}
+}*/
