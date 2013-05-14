@@ -602,7 +602,13 @@ func (t *Tree) term() Node {
     fmt.Println(":: VARIABLE")
     return t.useVar(token.pos, token.val)
   case itemField:
-    fmt.Println(":: FIELD")
+    fmt.Printf("funcs: %v", t.funcs)
+    if t.hasFunction(token.val) {
+      fmt.Printf("HAS FUNCTION!")
+      return NewIdentifier(token.val).SetPos(token.pos)
+    }
+    fmt.Printf("vars: %v", len(t.vars))
+    fmt.Println(":: FIELD: %v", token.val)
     return newField(token.pos, token.val)
   case itemBool:
     return newBool(token.pos, token.val == "true")

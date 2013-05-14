@@ -1,4 +1,4 @@
-// Copyright 2011 The Go Authors. All rights reserved.
+/// Copyright 2011 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -154,9 +154,12 @@ func (s *state) walk(dot reflect.Value, node parse.Node) {
   s.at(node)
   switch node := node.(type) {
   case *parse.ActionNode:
+    fmt.Printf("action node?")
     // Do not pop variables so they persist until next end.
     // Also, if the action declares variables, don't print the result.
     val := s.evalPipeline(dot, node.Pipe)
+    fmt.Printf("val: %v\n---\n", val)
+    fmt.Printf("node: %v\n----\n", node)
     if len(node.Pipe.Decl) == 0 {
       s.printValue(node, val)
     }
@@ -341,8 +344,10 @@ func (s *state) notAFunction(args []parse.Node, final reflect.Value) {
 
 func (s *state) evalCommand(dot reflect.Value, cmd *parse.CommandNode, final reflect.Value) reflect.Value {
   firstWord := cmd.Args[0]
+  fmt.Printf("fw: %v", firstWord)
   switch n := firstWord.(type) {
   case *parse.FieldNode:
+    fmt.Printf("FIELD NODE!!! %v", final)
     return s.evalFieldNode(dot, n, cmd.Args, final)
   case *parse.ChainNode:
     return s.evalChainNode(dot, n, cmd.Args, final)
@@ -462,6 +467,7 @@ func (s *state) evalField(dot reflect.Value, fieldName string, node parse.Node, 
   if ptr.Kind() != reflect.Interface && ptr.CanAddr() {
     ptr = ptr.Addr()
   }
+  fmt.Printf("fieldName: %v\n", fieldName)
   if method := ptr.MethodByName(fieldName); method.IsValid() {
     return s.evalCall(dot, method, node, fieldName, args, final)
   }
@@ -764,6 +770,11 @@ func (s *state) printValue(n parse.Node, v reflect.Value) {
   }
 
   if !v.Type().Implements(errorType) && !v.Type().Implements(fmtStringerType) {
+    if v.Type().Kind() == reflect.Func {
+      fmt.Println("** aye?")
+      // TODO: do this better!
+      fmt.Fprintf(s.wr, v.Call([]reflect.Value{})[0].Interface().(string))
+    }
     if v.CanAddr() && (reflect.PtrTo(v.Type()).Implements(errorType) || reflect.PtrTo(v.Type()).Implements(fmtStringerType)) {
       v = v.Addr()
     } else {
@@ -773,6 +784,7 @@ func (s *state) printValue(n parse.Node, v reflect.Value) {
       }
     }
   }
+
   fmt.Fprint(s.wr, v.Interface())
 }
 

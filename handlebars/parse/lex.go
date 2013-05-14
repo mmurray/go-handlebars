@@ -49,6 +49,7 @@ const (
   itemLeftParen  // '(' inside action
   itemNumber     // simple number, including imaginary
   itemPipe       // pipe symbol
+  itemPound       // pound symbol
   itemRawString  // raw quoted string (includes quotes)
   itemRightDelim // right action delimiter
   itemRightParen // ')' inside action
@@ -79,6 +80,7 @@ var key = map[string]itemType{
   "nil":      itemNil,
   "template": itemTemplate,
   "with":     itemWith,
+  "#":        itemPound,
 }
 
 const eof = -1
@@ -303,8 +305,12 @@ func lexInsideAction(l *lexer) stateFn {
     l.backup()
     return lexNumber
   case isAlphaNumeric(r):
+    fmt.Println("ALPHANUMERIC: ", r)
     l.backup()
-    return lexIdentifier
+    // if strings.Split(l.input[l.start:l.pos], " ") > 0 {
+
+    // }
+    return lexField
   case r == '(':
     l.emit(itemLeftParen)
     l.parenDepth++
@@ -317,6 +323,7 @@ func lexInsideAction(l *lexer) stateFn {
     }
     return lexInsideAction
   case r <= unicode.MaxASCII && unicode.IsPrint(r):
+    fmt.Println("ITEM CHAR: ", r)
     l.emit(itemChar)
     return lexInsideAction
   default:
@@ -402,6 +409,7 @@ func lexFieldOrVariable(l *lexer, typ itemType) stateFn {
   if !l.atTerminator() {
     return l.errorf("bad character %#U", r)
   }
+  fmt.Printf("emiting itemField: %v\n", l.input[l.start:l.pos])
   l.emit(typ)
   return lexInsideAction
 }

@@ -360,7 +360,10 @@ type FieldNode struct {
 }
 
 func newField(pos Pos, ident string) *FieldNode {
-  return &FieldNode{NodeType: NodeField, Pos: pos, Ident: strings.Split(ident[1:], ".")} // [1:] to drop leading period
+  if ident[0] == '.' {
+    ident = ident[1:] // [1:] to drop leading period
+  }
+  return &FieldNode{NodeType: NodeField, Pos: pos, Ident: strings.Split(ident, ".") }
 }
 
 func (f *FieldNode) String() string {
