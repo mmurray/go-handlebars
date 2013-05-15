@@ -154,7 +154,7 @@ func (s *state) walk(dot reflect.Value, node parse.Node) {
   s.at(node)
   switch node := node.(type) {
   case *parse.ActionNode:
-    fmt.Printf("action node?")
+    fmt.Println("## action node?")
     // Do not pop variables so they persist until next end.
     // Also, if the action declares variables, don't print the result.
     val := s.evalPipeline(dot, node.Pipe)
@@ -319,12 +319,17 @@ func (s *state) walkTemplate(dot reflect.Value, t *parse.TemplateNode) {
 // stack. Callers should therefore pop the stack after they are finished
 // executing commands depending on the pipeline value.
 func (s *state) evalPipeline(dot reflect.Value, pipe *parse.PipeNode) (value reflect.Value) {
+  fmt.Printf("\n\ndot: %v\n\n", value)
   if pipe == nil {
     return
   }
   s.at(pipe)
+  fmt.Printf("cmds: %v\n\n", pipe.Cmds[0])
   for _, cmd := range pipe.Cmds {
+
+    fmt.Println("value?: ", value)
     value = s.evalCommand(dot, cmd, value) // previous value is this one's final arg.
+    fmt.Println("value: ",value)
     // If the object has type interface{}, dig down one level to the thing inside.
     if value.Kind() == reflect.Interface && value.Type().NumMethod() == 0 {
       value = reflect.ValueOf(value.Interface()) // lovely!
