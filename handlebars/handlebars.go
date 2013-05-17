@@ -425,9 +425,9 @@ Outer:
             if name == "." || name == "this" {
               return v
             }
-            if helper, ok := helpers[name]; ok {
-              return reflect.ValueOf(helper("FOO", "BAR"))
-            }
+            // if helper, ok := helpers[name]; ok {
+            //   return reflect.ValueOf(helper("FOO", "BAR"))
+            // }
             switch av := v; av.Kind() {
             case reflect.Ptr:
                 v = av.Elem()
@@ -491,35 +491,6 @@ loop:
 
 func renderSection(section *sectionElement, contextChain []interface{}, buf io.Writer) {
     value := lookup(contextChain, section.name)
-    if handler, ok := helpers[section.name]; ok {
-      fmt.Printf("\nVALUE(%v): %v\n", section.name, value)
-      var stringBuf bytes.Buffer
-      if len(section.elems) == 1 {
-        renderElement(section.elems[0], contextChain, &stringBuf)
-
-        params := make([]interface{}, 0)
-        for _, piece := range section.params {
-            param := fmt.Sprintf("%v", piece)
-            if param == "this" {
-                param = `.`
-            }
-            if len(param) > 1 && param[0] == '"' && param[len(param) - 1] == '"' {
-                params = append(params, param[1:len(param)-1])
-            } else {
-                paramVal := lookup(contextChain, param)
-                if paramVal.IsValid() {
-                    params = append(params, paramVal.Interface())
-                }
-            }
-        }
-        params = append(params, stringBuf.String())
-
-        renderElement(&textElement{
-          text: []byte(handler(params...)),
-        }, contextChain, buf);
-      }
-      return
-    }
     var context = contextChain[len(contextChain)-1].(reflect.Value)
     var contexts = []interface{}{}
     // if the value is nil, check if it's an inverted section
@@ -544,6 +515,45 @@ func renderSection(section *sectionElement, contextChain []interface{}, buf io.W
         }
     } else if section.inverted {
         contexts = append(contexts, context)
+    }
+    fmt.Println("has handler? ", section.name)
+    if handler, ok := helpers[section.name]; ok {
+      fmt.Printf("\nVALUE(%v): %v\n", section.name, value)
+      fmt.Println("els: ", section.elems)
+      var stringBuf bytes.Buffer
+      if len(section.elems) >= 1 {
+        chain2 := make([]interface{}, len(contextChain)+1)
+        copy(chain2[1:], contextChain)
+        for _, ctx := range contexts {
+            chain2[0] = ctx
+            for _, elem := range section.elems {
+                renderElement(elem, chain2, buf)
+            }
+        }
+        // renderElement(section.elems[0], contextChain, &stringBuf)
+
+        params := make([]interface{}, 0)
+        for _, piece := range section.params {
+            param := fmt.Sprintf("%v", piece)
+            if param == "this" {
+                param = `.`
+            }
+            if len(param) > 1 && param[0] == '"' && param[len(param) - 1] == '"' {
+                params = append(params, param[1:len(param)-1])
+            } else {
+                paramVal := lookup(contextChain, param)
+                if paramVal.IsValid() {
+                    params = append(params, paramVal.Interface())
+                }
+            }
+        }
+        params = append(params, stringBuf.String())
+fmt.Printf("params: %v\n----", params)
+        renderElement(&textElement{
+          text: []byte(handler(params...)),
+        }, contextChain, buf);
+      }
+      return
     }
 
     chain2 := make([]interface{}, len(contextChain)+1)

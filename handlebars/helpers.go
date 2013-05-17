@@ -21,6 +21,7 @@ func init() {
           if tmpl, ok := ContentFor(fmt.Sprintf("%v", params[0])); ok {
             return tmpl.Render()
           } else {
+            fmt.Println("PARAAMMMS::: ", params)
             return fmt.Sprintf("%v", params[1])
           }
           return ""
