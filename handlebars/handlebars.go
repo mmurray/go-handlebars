@@ -493,44 +493,23 @@ func renderSection(section *sectionElement, contextChain []interface{}, buf io.W
     value := lookup(contextChain, section.name)
     var context = contextChain[len(contextChain)-1].(reflect.Value)
     var contexts = []interface{}{}
-    // if the value is nil, check if it's an inverted section
-    isEmpty := isEmpty(value)
-    if isEmpty && !section.inverted || !isEmpty && section.inverted {
-        return
-    } else if !section.inverted {
-        valueInd := indirect(value)
-        switch val := valueInd; val.Kind() {
-        case reflect.Slice:
-            for i := 0; i < val.Len(); i++ {
-                contexts = append(contexts, val.Index(i))
-            }
-        case reflect.Array:
-            for i := 0; i < val.Len(); i++ {
-                contexts = append(contexts, val.Index(i))
-            }
-        case reflect.Map, reflect.Struct:
-            contexts = append(contexts, value)
-        default:
-            contexts = append(contexts, context)
-        }
-    } else if section.inverted {
-        contexts = append(contexts, context)
-    }
     fmt.Println("has handler? ", section.name)
     if handler, ok := helpers[section.name]; ok {
       fmt.Printf("\nVALUE(%v): %v\n", section.name, value)
       fmt.Println("els: ", section.elems)
       var stringBuf bytes.Buffer
       if len(section.elems) >= 1 {
-        chain2 := make([]interface{}, len(contextChain)+1)
+/*        chain2 := make([]interface{}, len(contextChain)+1)
         copy(chain2[1:], contextChain)
         for _, ctx := range contexts {
             chain2[0] = ctx
             for _, elem := range section.elems {
-                renderElement(elem, chain2, buf)
+                renderElement(elem, chain2, &stringBuf)
             }
+        }*/
+        for _, elem := range section.elems {
+            renderElement(elem, contextChain, &stringBuf)
         }
-        // renderElement(section.elems[0], contextChain, &stringBuf)
 
         params := make([]interface{}, 0)
         for _, piece := range section.params {
@@ -554,6 +533,29 @@ fmt.Printf("params: %v\n----", params)
         }, contextChain, buf);
       }
       return
+    }
+    // if the value is nil, check if it's an inverted section
+    isEmpty := isEmpty(value)
+    if isEmpty && !section.inverted || !isEmpty && section.inverted {
+        return
+    } else if !section.inverted {
+        valueInd := indirect(value)
+        switch val := valueInd; val.Kind() {
+        case reflect.Slice:
+            for i := 0; i < val.Len(); i++ {
+                contexts = append(contexts, val.Index(i))
+            }
+        case reflect.Array:
+            for i := 0; i < val.Len(); i++ {
+                contexts = append(contexts, val.Index(i))
+            }
+        case reflect.Map, reflect.Struct:
+            contexts = append(contexts, value)
+        default:
+            contexts = append(contexts, context)
+        }
+    } else if section.inverted {
+        contexts = append(contexts, context)
     }
 
     chain2 := make([]interface{}, len(contextChain)+1)
@@ -580,12 +582,14 @@ func renderElement(element interface{}, contextChain []interface{}, buf io.Write
             }
         }()
 
-        helperPieces := strings.Split(elem.name, " ")
-        if len(helperPieces) > 0 {
-            if helper, ok := helpers[helperPieces[0]]; ok {
+        elPieces := strings.Split(elem.name, " ")
+        var val reflect.Value
+        params := []reflect.Value{}
+        if len(elPieces) > 1 {
+            if helper, ok := helpers[elPieces[0]]; ok {
                 params := make([]interface{}, 0)
-                if len(helperPieces) > 1 {
-                    for _, piece := range helperPieces[1:] {
+                if len(elPieces) > 1 {
+                    for _, piece := range elPieces[1:] {
                         param := fmt.Sprintf("%v", piece)
                         if param == "this" {
                             param = `.`
@@ -609,15 +613,65 @@ func renderElement(element interface{}, contextChain []interface{}, buf io.Write
                 } else {
                     htmlEscape(buf, []byte(result))
                 }
+                return
+            } else {
+              val = lookup(contextChain, elPieces[0])
+              for _, piece := range elPieces[1:] {
+                fmt.Printf("adding Param!!!\n")
+                if piece[0] == '"' && piece[len(piece)-1] == '"' {
+                  // is a string param
+                  params = append(params, reflect.ValueOf(piece[1:len(piece)-1]))
+                } else {
+                  var sbuf bytes.Buffer
+                  pv := lookup(contextChain, piece)
+                  if (pv.IsValid()) {
+                    s := fmt.Sprint(pv.Interface())
+                    htmlEscape(&sbuf, []byte(s))
+                    params = append(params, reflect.ValueOf(sbuf.String()))
+                  }
+                }
+              }
             }
+        } else {
+          pathPieces := strings.Split(elem.name, ".")
+          if len(pathPieces) > 1 {
+            // looks like a path
+            curVal := lookup(contextChain, pathPieces[0])
+            for i, _ := range pathPieces {
+              fmt.Println("curVal: ", curVal)
+              if i == len(pathPieces) - 1 {
+                // TODO: HTML escape?
+                val = curVal
+                break
+              }
+              if curVal.IsValid() {
+                indVal := indirect(curVal)
+                fmt.Println("%v", indVal.Kind())
+                if indVal.IsValid() && indVal.Kind() == reflect.Map {
+                  fmt.Printf("IS A MAP")
+                  fmt.Printf("looking up map key: %v\n\n", pathPieces[i+1])
+                  curVal = indVal.MapIndex(reflect.ValueOf(pathPieces[i+1]))
+                }
+              }
+            }
+          } else {
+            // not a path or helper, just lookup value by key normally
+            val = lookup(contextChain, elem.name)
+          }
         }
-        val := lookup(contextChain, elem.name)
 
         if val.IsValid() {
             if elem.raw {
                 fmt.Fprint(buf, val.Interface())
             } else {
-                s := fmt.Sprint(val.Interface())
+                var s string
+                if(indirect(val).Type().Kind() == reflect.Func) {
+                  fmt.Printf("params: %v", params)
+                  s = fmt.Sprint(indirect(val).Call(params)[0])
+                } else {
+                  s = fmt.Sprint(val.Interface())
+                }
+                fmt.Printf(s)
                 htmlEscape(buf, []byte(s))
             }
         }
