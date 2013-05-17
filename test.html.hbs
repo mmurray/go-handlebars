@@ -1,0 +1,10 @@
+<html>
+  <head></head>
+  <body>
+    Hello, {{foo}}
+    {{#yield "body"}}haha {{foo}}{{/yield}}
+    {{#posts}}
+      <li>Url: {{foo}} lala {{bar2}}</li>
+    {{/posts}}
+  </body>
+</html>

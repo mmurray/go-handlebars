@@ -14,6 +14,7 @@ func init() {
         })
 
         RegisterHelper("yield", func(params ...interface{}) string {
+          fmt.Println("yield..", len(params))
           if len(params) != 2 {
             return ""
           }

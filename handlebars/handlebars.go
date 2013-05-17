@@ -425,7 +425,8 @@ Outer:
             if name == "." || name == "this" {
               return v
             }
-            if _, ok := helpers[name]; ok {
+            if helper, ok := helpers[name]; ok {
+              return reflect.ValueOf(helper("FOO", "BAR"))
             }
             switch av := v; av.Kind() {
             case reflect.Ptr:
@@ -559,8 +560,10 @@ func renderSection(section *sectionElement, contextChain []interface{}, buf io.W
 func renderElement(element interface{}, contextChain []interface{}, buf io.Writer) {
     switch elem := element.(type) {
     case *textElement:
+        fmt.Println("*text");
         buf.Write(elem.text)
     case *varElement:
+        fmt.Println("*var");
         defer func() {
             if r := recover(); r != nil {
                 fmt.Printf("Panic while looking up %q: %s\n", elem.name, r)
@@ -609,13 +612,16 @@ func renderElement(element interface{}, contextChain []interface{}, buf io.Write
             }
         }
     case *sectionElement:
+        fmt.Println("*section");
         renderSection(elem, contextChain, buf)
     case *Template:
+        fmt.Println("*template");
         elem.renderTemplate(contextChain, buf)
     }
 }
 
 func (tmpl *Template) renderTemplate(contextChain []interface{}, buf io.Writer) {
+  fmt.Printf("rendering an alement (%v)\n\n", len(tmpl.elems))
     for _, elem := range tmpl.elems {
         renderElement(elem, contextChain, buf)
     }
